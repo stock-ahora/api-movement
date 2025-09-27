@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	// Obtener configuración de AWS Secret Manager
-	cfg, err := config.LoadFromSecretManager("stock-ahora/config")
+	cfg, err := config.LoadLocalConfig()
 	if err != nil {
 		log.Fatalf("❌ Error obteniendo configuración: %v", err)
 	}
