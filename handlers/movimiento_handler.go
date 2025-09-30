@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"api-movimiento/models"
 	"api-movimiento/services"
 	"net/http"
 	"strconv"
@@ -148,8 +147,8 @@ func (h *MovimientoHandler) ObtenerMovimientosSku(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"sku_id":             skuID,
-		"total_movimientos":  len(movimientos),
+		"sku_id":            skuID,
+		"total_movimientos": len(movimientos),
 		"limit":             limit,
 		"movimientos":       movimientos,
 	})
@@ -199,11 +198,11 @@ func (h *MovimientoHandler) ObtenerMovimientosRequest(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"request_id":            requestID,
-		"total_movimientos":     len(movimientos),
-		"productos_afectados":   len(productStats),
-		"limit":                limit,
-		"movimientos":          movimientos,
+		"request_id":             requestID,
+		"total_movimientos":      len(movimientos),
+		"productos_afectados":    len(productStats),
+		"limit":                  limit,
+		"movimientos":            movimientos,
 		"estadisticas_productos": productStats,
 	})
 }

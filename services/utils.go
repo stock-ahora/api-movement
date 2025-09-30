@@ -20,9 +20,5 @@ func (s *MovimientoService) CheckRabbitConnection() error {
 		return fmt.Errorf("canal RabbitMQ no inicializado")
 	}
 
-	if s.rabbitCh.IsClosed() {
-		return fmt.Errorf("canal RabbitMQ cerrado")
-	}
-
 	return nil
 }
