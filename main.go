@@ -1,134 +1,75 @@
 package main
 
 import (
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
+    "api-movement/config"
+    "api-movement/database"
+    "crypto/tls"
+    "crypto/x509"
+    "fmt"
+    "log"
 
-	"api-movimiento/config"
-	"api-movimiento/database"
-	"api-movimiento/handlers"
-	"api-movimiento/services"
-
-	"github.com/gin-gonic/gin"
+    "github.com/streadway/amqp"
 )
 
 func main() {
-	// Obtener configuración de AWS Secret Manager
-	cfg, err := config.LoadLocalConfig()
-	if err != nil {
-		log.Fatalf("❌ Error obteniendo configuración: %v", err)
-	}
+    log.Println("=== Starting Movement Consumer ===")
 
-	// Conectar a PostgreSQL
-	db, err := database.Connect(cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("❌ Error conectando a base de datos: %v", err)
-	}
-	defer db.Close()
+    cfg, err := config.LoadSecretManager(nil)
+    if err != nil {
+        log.Fatalf("❌ Error cargando config: %v", err)
+    }
 
-	// Inicializar tablas
-	if err := database.InitTables(db); err != nil {
-		log.Fatalf("❌ Error inicializando base de datos: %v", err)
-	}
+    // Conectar a PostgreSQL
+    db, err := database.Connect(cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+    if err != nil {
+        log.Fatalf("❌ Error conectando a PostgreSQL: %v", err)
+    }
+    defer db.Close()
+    log.Println("✅ Conectado a PostgreSQL")
 
-	// Conectar a RabbitMQ
-	conn, ch, err := config.NewRabbitMQ(cfg.RabbitMQConfig)
-	if err != nil {
-		log.Fatalf("❌ Error conectando a RabbitMQ: %v", err)
-	}
-	defer conn.Close()
-	defer ch.Close()
+    // Conectar a RabbitMQ con TLS
+    rootCAs, _ := x509.SystemCertPool()
+    tlsConfig := &tls.Config{RootCAs: rootCAs}
 
-	// Declarar colas
-	err = services.DeclareQueues(ch)
-	if err != nil {
-		log.Fatalf("❌ Error declarando colas: %v", err)
-	}
+    rabbitURL := fmt.Sprintf("amqps://%s:%s@%s:%s/%s",
+        cfg.RabbitUser, cfg.RabbitPass, cfg.RabbitHost, cfg.RabbitPort, cfg.RabbitVHost)
 
-	// Crear servicio de movimientos
-	movService := services.NewMovimientoService(db, cfg, ch)
+    conn, err := amqp.DialTLS(rabbitURL, tlsConfig)
+    if err != nil {
+        log.Fatalf("❌ Error conectando a RabbitMQ: %v", err)
+    }
+    defer conn.Close()
 
-	// Iniciar consumer de RabbitMQ en goroutine
-	go func() {
-		log.Println("🐰 Iniciando consumer de RabbitMQ...")
-		if err := movService.StartConsumer(); err != nil {
-			log.Fatalf("❌ Error iniciando consumer: %v", err)
-		}
-	}()
+    ch, err := conn.Channel()
+    if err != nil {
+        log.Fatalf("❌ Error creando canal: %v", err)
+    }
+    defer ch.Close()
+    log.Println("✅ Conectado a RabbitMQ")
 
-	// Configurar router HTTP (solo para consultas)
-	router := setupRouter(movService)
+    // Declarar queue
+    queueName := "movement.generated"
+    queue, err := ch.QueueDeclare(queueName, true, false, false, false, nil)
+    if err != nil {
+        log.Fatalf("❌ Error declarando queue: %v", err)
+    }
 
-	// Canal para manejar señales del sistema
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+    // Consumir mensajes
+    msgs, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
+    if err != nil {
+        log.Fatalf("❌ Error iniciando consumer: %v", err)
+    }
 
-	// Iniciar servidor HTTP en goroutine
-	go func() {
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8000"
-		}
+    log.Printf("✅ Esperando mensajes en queue '%s'...", queueName)
 
-		log.Printf("🚀 Servidor API Movimientos iniciando en puerto %s", port)
-		log.Printf("📊 Endpoints disponibles:")
-		log.Printf("   GET  /api/v1/movimientos - Listar movimientos")
-		log.Printf("   GET  /api/v1/movimientos/producto/{id}/trazabilidad - Trazabilidad completa")
-		log.Printf("   GET  /api/v1/movimientos/sku/{id} - Movimientos por SKU")
-		log.Printf("   GET  /api/v1/health - Health check")
-		log.Printf("   GET  /api/v1/metrics - Métricas del sistema")
-		log.Printf("🐰 Consumer RabbitMQ escuchando en: movimientos_queue")
+    forever := make(chan bool)
 
-		if err := router.Run(":" + port); err != nil {
-			log.Fatalf("❌ Error iniciando servidor: %v", err)
-		}
-	}()
+    go func() {
+        for msg := range msgs {
+            log.Printf("📦 Mensaje recibido: %s", string(msg.Body))
+            msg.Ack(false)
+        }
+    }()
 
-	// Esperar señal de terminación
-	<-sigChan
-	log.Println("🛑 Cerrando aplicación...")
-}
-
-func setupRouter(movService *services.MovimientoService) *gin.Engine {
-	router := gin.Default()
-
-	// Middlewares
-	router.Use(gin.Logger())
-	router.Use(gin.Recovery())
-
-	// CORS
-	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-
-		c.Next()
-	})
-
-	// Crear handlers
-	movHandler := handlers.NewMovimientoHandler(movService)
-	healthHandler := handlers.NewHealthHandler(movService)
-
-	// Rutas API (solo consultas)
-	api := router.Group("/api/v1")
-	{
-		// Consultas de movimientos
-		api.GET("/movimientos", movHandler.ListarMovimientos)
-		api.GET("/movimientos/producto/:product_id/trazabilidad", movHandler.ObtenerTrazabilidad)
-		api.GET("/movimientos/sku/:sku_id", movHandler.ObtenerMovimientosSku)
-		api.GET("/movimientos/request/:request_id", movHandler.ObtenerMovimientosRequest)
-
-		// Health y métricas
-		api.GET("/health", healthHandler.HealthCheck)
-		api.GET("/metrics", healthHandler.GetMetrics)
-	}
-
-	return router
+    <-forever
 }
