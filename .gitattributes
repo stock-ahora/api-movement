@@ -1,0 +1,10 @@
+# Establece el comportamiento predeterminado para todos los archivos de texto
+* text=auto eol=lf
+
+# Asegura que los archivos específicos de Go siempre usen LF
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+*.md text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf

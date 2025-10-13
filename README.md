@@ -1,268 +1,167 @@
-# API Movimiento - Stock Ahora
+API Movimiento - TrueStock движения
+Sistema de procesamiento y consulta de movimientos de inventario, que consume eventos desde RabbitMQ y expone una API REST para la trazabilidad de los mismos.
 
-**Sistema de trazabilidad de movimientos de inventario** que procesa mensajes desde RabbitMQ y proporciona APIs de consulta para análisis y reportes.
+🚀 Características Principales
+🔄 Consumidor Asíncrono: Procesa eventos de movimientos de inventario de forma robusta y desacoplada utilizando RabbitMQ.
 
-## Características principales
+🌐 API REST de Consulta: Endpoints para consultar el historial de movimientos registrados en el sistema.
 
-- **Consumer RabbitMQ**: Procesa movimientos automáticamente desde colas
-- **API de Consultas**: Endpoints REST para obtener trazabilidad y métricas
-- **Seguridad**: Encriptación AES-256 de datos sensibles
-- **Integración**: Compatible con API Stock existente (UUID, PostgreSQL)
-- **Métricas**: Sistema completo de métricas y health checks
-- **Contenedores**: Desarrollo y producción con Docker
+🐘 Base de Datos Relacional: Almacena de forma persistente todos los movimientos en PostgreSQL.
 
-## Estructura del proyecto
+🐳 Infraestructura como Código (IaC): Preparado para ser gestionado y desplegado utilizando Docker y Makefiles.
 
-```
-api-movimiento/
-├── main.go                     # Punto de entrada principal
-├── go.mod                      # Dependencias Go
-├── Dockerfile                  # Imagen Docker optimizada
-├── docker-compose.yml          # Stack completo con profiles
-├── Makefile                    # Comandos automatizados
-├── .env                        # Variables de entorno
+⚙️ Configuración Centralizada: Gestión de la configuración a través de variables de entorno para una fácil adaptación entre entornos.
+
+🏗️ Estructura del Proyecto
+El proyecto está organizado con un enfoque en la separación de responsabilidades:
+
+Bash
+
+api-movement/
+├── 🚀 main.go                     # Punto de entrada: inicia el consumidor y el servidor API
+├── 📦 go.mod                      # Módulo y dependencias de Go
+├── 🔑 .env                        # Variables de entorno locales (NO incluir en Git)
+├── 🐳 Dockerfile                  # (Pendiente) Definición de la imagen Docker
+├── 🛠️ Makefile                    # (Pendiente) Comandos de automatización
+│
+├── api/
+│   ├── 📡 handler.go              # Manejadores de las peticiones HTTP
+│   └── 🗺️ router.go               # Definición de las rutas de la API
+│
 ├── config/
-│   └── config.go              # Configuración AWS y RabbitMQ TLS
-├── models/
-│   └── models.go              # Modelos de datos compatible con API Stock
+│   └── 📜 secret_manager.go       # Carga de configuración desde .env
+│
+├── consumer/
+│   └── 🐇 rabbitmq_consumer.go    # Lógica del consumidor de RabbitMQ
+│
 ├── database/
-│   └── database.go            # Conexión PostgreSQL y migraciones
-├── services/
-│   ├── movimiento_service.go  # Consumer RabbitMQ y lógica principal
-│   ├── query_service.go       # Servicios de consulta
-│   └── utils.go              # Utilidades y health checks
-├── handlers/
-│   ├── movimiento_handler.go  # Endpoints HTTP de consulta
-│   └── health_handler.go      # Health check y métricas
-└── scripts/
-    └── test_publisher.go      # Script para enviar mensajes de prueba
-```
+│   └── 🐘 database.go             # Conexión a la base de datos PostgreSQL
+│
+├── models/
+│   └── 📝 models.go               # Structs y modelos de datos de la aplicación
+│
+└── services/
+└── ✨ movimiento_service.go   # Lógica de negocio para procesar y consultar movimientos
+⚙️ Configuración Inicial
+Sigue estos pasos para poner en marcha el proyecto.
 
-##  Configuración inicial
+1. Requisitos Previos
+   ✅ Go (versión 1.18 o superior)
 
-### 1. Clonar y configurar proyecto
+✅ Acceso a una base de datos PostgreSQL
 
-```bash
+✅ Acceso a un broker RabbitMQ
+
+2. Clonar y Preparar
+   Bash
+
+# Clonar el repositorio
 git clone <tu-repo>
-cd api-movimiento
-make setup
-```
+cd api-movement
 
-### 2. Configurar variables de entorno
+# Instalar dependencias
+go mod tidy
+3. Configurar Variables de Entorno
+   Crea un archivo .env en la raíz del proyecto. ⚠️ ¡IMPORTANTE! Asegúrate de que este archivo esté en tu .gitignore y nunca lo subas al repositorio.
 
-```bash
-# Copiar archivo de ejemplo
-cp .env.example .env
+Bash
 
-# Editar con tus credenciales
-nano .env
-```
+# .env - Archivo de ejemplo
+# === PostgreSQL Configuration ===
+DB_USER=db_usuarios
+DB_PASSWORD=tu_password_secreto
+DB_HOST=tu_host_rds.us-east-2.rds.amazonaws.com
+DB_PORT=54320
+DB_NAME=appdb
 
-### 3. Generar clave de encriptación
+# === RabbitMQ Configuration ===
+RABBIT_USER=adminuser
+RABBIT_PASSWORD=tu_password_secreto
+RABBIT_HOST=tu_broker_mq.us-east-2.on.aws
+RABBIT_PORT=567000
+RABBIT_VHOST=/
 
-```bash
-make generate-key
-# Copiar la clave generada al AWS Secrets Manager
-```
+▶️ Ejecución Local
+Una vez configurado, ejecuta la aplicación con el siguiente comando:
 
-### 4. Configurar AWS Secret Manager
+Bash
 
-```json
+go run main.go
+Si todo es correcto, verás un log de inicio similar a este:
+
+Fragmento de código
+
+2025/10/13 16:06:03 === Iniciando API y Consumidor de Movimientos ===
+2025/10/13 16:06:03 Cargando configuración desde .env
+2025/10/13 16:06:05 ✅ Conectado a PostgreSQL
+2025/10/13 16:06:05 ✅ Servicio de movimientos listo
+2025/10/13 16:06:05 🚀 Servidor HTTP escuchando en el puerto :8080
+2025/10/13 16:06:06 ✅ Conectado a RabbitMQ
+2025/10/13 16:06:06 ✅ Esperando mensajes en queue 'movement.generated'...
+📨 Estructura del Mensaje RabbitMQ
+El consumidor espera mensajes en la cola movement.generated con la siguiente estructura JSON:
+
+JSON
+
 {
-  "database_url": "postgresql://user:pass@host:5432/movimientos_db",
-  "encryption_key": "tu_clave_base64_32_bytes",
-  "stock_api_url": "http://tu-api-stock:8001",
-  "stock_api_key": "tu_api_key",
-  "redis_url": "redis://redis:6379/0",
-  "rabbitmq_config": {
-    "user": "tu_usuario",
-    "password": "tu_password", 
-    "host": "tu_host_rabbitmq",
-    "port": 5671,
-    "vhost": "/"
-  }
-}
-```
-
-## Ejecución
-
-### Desarrollo local con RabbitMQ
-
-```bash
-# Levantar stack de desarrollo
-make up
-
-# Ver logs en tiempo real
-make logs-api
-
-# Probar con mensaje de prueba
-make test-consumer
-```
-
-### Solo producción
-
-```bash
-# Stack mínimo de producción
-make up-prod
-```
-
-### Con monitoreo completo
-
-```bash
-# Incluye Grafana y Prometheus
-make up-monitoring
-```
-
-## Estructura del mensaje RabbitMQ
-
-El API consume mensajes de la cola `movimientos_queue` con esta estructura:
-
-```json
+"id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+"request_id": "f0e9d8c7-b6a5-4321-fedc-ba9876543210",
+"products": [
 {
-  "product_id": "123e4567-e89b-12d3-a456-426614174000",
-  "sku_id": "123e4567-e89b-12d3-a456-426614174001",
-  "request_id": "123e4567-e89b-12d3-a456-426614174002", 
-  "document_id": "123e4567-e89b-12d3-a456-426614174003",
-  "tipo_movimiento": "entrada|salida|ajuste",
-  "cantidad": 50,
-  "usuario_id": "user123",
-  "motivo": "Descripción del movimiento",
-  "client_account_id": "123e4567-e89b-12d3-a456-426614174004",
-  "origen": "ocr|manual|api|sistema",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "metadata": {
-    "documento_origen": "factura_001.pdf",
-    "proveedor": "Proveedor XYZ"
-  }
+"product_id": "c1d2e3f4-a5b6-c7d8-e9f0-1234567890ab",
+"count": 10,
+"movement_id": "d1e2f3a4-b5c6-d7e8-f9a0-b1c2d3e4f5a6",
+"date_limit": "2025-12-31T23:59:59Z",
+"movement_type": 1,
+"created_at": "2025-10-13T16:00:00Z"
 }
-```
-
-## Endpoints disponibles
-
-### Consultas de movimientos
-
-```http
-GET /api/v1/movimientos
-    ?product_id={uuid}
-    &sku_id={uuid}
-    &request_id={uuid}
-    &client_account_id={uuid}
-    &tipo_movimiento=entrada|salida|ajuste
-    &origen=ocr|manual|api
-    &limit=100
-
-GET /api/v1/movimientos/producto/{product_id}/trazabilidad
-    ?include_requests=true
-
-GET /api/v1/movimientos/sku/{sku_id}
-    ?limit=50
-
-GET /api/v1/movimientos/request/{request_id}
-    ?limit=100
-```
-
-### Sistema
-
-```http
-GET /api/v1/health         # Estado del sistema
-GET /api/v1/metrics        # Métricas detalladas
-```
-
-## Comandos útiles
-
-```bash
-# === DESARROLLO ===
-make build              # Compilar aplicación
-make run               # Ejecutar localmente  
-make run-dev           # Auto-reload (requiere air)
-make test              # Ejecutar tests
-make lint              # Linter
-make format            # Formatear código
-
-# === DOCKER ===
-make docker-build      # Construir imagen
-make up                # Levantar desarrollo
-make up-prod           # Levantar producción
-make down              # Bajar servicios
-make logs              # Ver logs
-make restart           # Reiniciar
-
-# === UTILIDADES ===
-make health            # Verificar salud
-make metrics           # Ver métricas actuales
-make test-endpoints    # Probar todos los endpoints
-make clean             # Limpiar archivos
-make reset             # Reset completo
-
-# === BASE DE DATOS ===
-make db-backup         # Backup
-make db-restore        # Restaurar
-make clean-volumes     # ⚠️ Borrar todos los datos
-```
-
-## Perfiles de Docker Compose
-
-- **default**: Solo API y PostgreSQL
-- **dev**: + RabbitMQ Management para desarrollo
-- **monitoring**: + Prometheus y Grafana
-- **production**: + Nginx y SSL
-
-```bash
-# Ejemplos de uso
-docker-compose --profile dev up -d
-docker-compose --profile monitoring up -d
-```
-
-## Flujo de procesamiento
-
-1. **Mensaje llega** a `movimientos_queue`
-2. **Consumer valida** estructura y datos
-3. **Consulta stock actual** del API Stock
-4. **Calcula nuevo stock** según tipo de movimiento
-5. **Actualiza stock** en API Stock vía HTTP
-6. **Guarda movimiento** en PostgreSQL con datos encriptados
-7. **Publica notificación** a cola de notificaciones
-8. **Confirma mensaje** procesado o envía a cola de error
-
-## Integración con tu API Stock
-
-El servicio se integra automáticamente con tu API Stock:
-
-```go
-// Obtener producto
-GET {STOCK_API_URL}/products/{product_id}
-Authorization: Bearer {STOCK_API_KEY}
-
-// Actualizar stock  
-PUT {STOCK_API_URL}/products/{product_id}
-Content-Type: application/json
-{
-  "stock": 150
+]
 }
-```
+🌐 Endpoints Disponibles
+La API expone los siguientes endpoints para consulta:
 
-## Seguridad
+Consultar todos los movimientos
+Retorna una lista de los últimos 100 movimientos registrados.
 
-- **Encriptación AES-256** de datos sensibles
-- **TLS/SSL** para conexiones RabbitMQ
-- **JWT/Bearer tokens** para API Stock
-- **Validación UUID** en todos los endpoints
-- **Rate limiting** y timeouts
-- **Health checks** para monitoreo
+<pre><code><span style="color: #61AFEF;">GET</span> /movements</code></pre>
 
-## Monitoreo
+Consultar un movimiento por ID
+Retorna los detalles de un movimiento específico, incluyendo la lista de productos asociados.
 
-### Métricas disponibles
+<pre><code><span style="color: #61AFEF;">GET</span> /movements/{id}</code></pre>
 
-- Total de movimientos procesados
-- Movimientos por tipo (entrada/salida/ajuste)
-- Movimientos por origen (OCR/manual/API)
-- Últimos movimientos
-- Estado de conexiones (DB/RabbitMQ)
-- Tiempo de respuesta de endpoints
+{id}: El UUID del movimiento a consultar.
 
-### Dashboards Grafana
+🔄 Flujo de Procesamiento de Mensajes
+📥 Recepción del Mensaje: El consumidor escucha en la cola movement.generated.
 
-- Overview del sistema
-- Trazabilidad por producto
-- Performance
+🧾 Decodificación: El cuerpo del mensaje (JSON) se mapea al struct MovementsEvent.
+
+⏳ Transacción en Base de Datos: Se inicia una transacción en PostgreSQL para garantizar la atomicidad.
+
+💾 Persistencia:
+
+Se inserta un registro principal en la tabla movement.
+
+Se itera sobre los productos y se inserta cada uno en request_per_product.
+
+✅ Confirmación: Si la transacción es exitosa, se envía un ACK a RabbitMQ para eliminar el mensaje. Si falla, se envía un NACK para que el mensaje sea reintentado.
+
+🗺️ Futuras Mejoras y Próximos Pasos
+Este proyecto tiene una base sólida. Las próximas mejoras planeadas incluyen:
+
+[ ] 🐳 Contenerización: Finalizar el Dockerfile y docker-compose.yml para facilitar el despliegue.
+
+[ ] 🤖 Automatización: Implementar los comandos del Makefile para agilizar tareas (build, test, run).
+
+[ ] 🛡️ Seguridad Avanzada:
+
+Implementar encriptación (ej. AES-256) para datos sensibles en la base de datos.
+
+Integrar un sistema de autenticación (ej. JWT) para los endpoints de la API.
+
+[ ] 🔍 API de Consulta Avanzada: Expandir los endpoints para permitir filtrado por producto, tipo de movimiento, fechas, etc.
+
+[ ] 📊 Monitoreo y Métricas: Añadir un endpoint /metrics para Prometheus y un endpoint /health detallado.
+
+[ ] 🔗 Integración con API Stock: Desarrollar la lógica para consultar y actualizar el stock en el servicio api-stock.

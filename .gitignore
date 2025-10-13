@@ -1,33 +1,13 @@
-# Archivos y carpetas de Go
- bin/
- build/
- *.exe
- *.test
- *.out
+# Archivos de entorno
+.env
 
- # Módulos y dependencias
- vendor/
- go.sum
+# Binarios y ejecutables
+*.exe
+*.out
 
- # Archivos del sistema operativo
- .DS_Store
- Thumbs.db
+# Archivos de dependencias o temporales
+vendor/
+*.log
 
- # Archivos de configuración de IDEs
- .idea/
- .vscode/
- *.swp
-
- # Archivos de log y temporales
- *.log
- *.tmp
-
- # Archivos de entorno
- .env
- .env.*
-
- # Ignorar el directorio de cobertura de pruebas
- coverage/
-
- # Ignorar archivos generados por GoLand
- *.iml
+# Archivos del sistema
+.DS_Store
