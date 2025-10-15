@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 API Movimiento - TrueStock движения
 Sistema de procesamiento y consulta de movimientos de inventario, que consume eventos desde RabbitMQ y expone una API REST para la trazabilidad de los mismos.
 
@@ -165,3 +166,6 @@ Integrar un sistema de autenticación (ej. JWT) para los endpoints de la API.
 [ ] 📊 Monitoreo y Métricas: Añadir un endpoint /metrics para Prometheus y un endpoint /health detallado.
 
 [ ] 🔗 Integración con API Stock: Desarrollar la lógica para consultar y actualizar el stock en el servicio api-stock.
+=======
+# api-movement
+>>>>>>> ed5b1d630508ad28ba1b28bfaf42acd9af87d403
