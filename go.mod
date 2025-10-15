@@ -1,4 +1,4 @@
-module github.com/stock-ahora/api-stock
+module api-movement
 
 go 1.25.0
 
