@@ -5,7 +5,7 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 # Copiar go.mod y go.sum primero para aprovechar cache
-COPY go.mod go.sum ./
+COPY go.mod go.sum
 RUN go mod download
 
 # Copiar el resto del código
