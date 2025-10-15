@@ -41,15 +41,17 @@ func (s *MovimientoService) ProcessMovement(event models.MovementsEvent) error {
 		}
 	}()
 
-	movementQuery := `INSERT INTO movement (id, request_id, created_at) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`
-	_, err = tx.Exec(movementQuery, event.Id, event.RequestId, time.Now())
-	if err != nil {
-		return fmt.Errorf("error insertando en movement: %w", err)
-	}
+	for _, movementProduct := range event.ProductPerMovement {
 
-	productQuery := `INSERT INTO request_per_product (id, movement_id, product_id, count, movement_type, date_limit, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	for _, p := range event.ProductPerMovement {
-		_, err = tx.Exec(productQuery, p.MovementId, event.Id, p.ProductID, p.Count, p.MovementTypeId, p.DateLimit, p.CreatedAt)
+		movementQuery := `INSERT INTO movement (id, count, product_id, request_id, movement_type_id, create_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING`
+		_, err = tx.Exec(movementQuery, movementProduct.Id, movementProduct.Count, movementProduct.ProductID, event.RequestId, movementProduct.MovementTypeId, movementProduct.CreatedAt)
+		if err != nil {
+			return nil
+			log.Printf("error insertando en movement")
+		}
+
+		productQuery := `INSERT INTO request_per_product (id, product_id, movement_id, request_id) VALUES ($1, $2, $3, $4)`
+		_, err = tx.Exec(productQuery, uuid.New(), movementProduct.ProductID, movementProduct.Id, event.RequestId)
 		if err != nil {
 			return fmt.Errorf("error insertando en request_per_product: %w", err)
 		}

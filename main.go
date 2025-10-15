@@ -49,6 +49,7 @@ func main() {
 	// Goroutine para el consumidor de RabbitMQ
 	g.Go(func() error {
 		return startRabbitMQConsumer(ctx, cfg, movimientoService)
+
 	})
 
 	// Goroutine para el servidor HTTP API
@@ -108,7 +109,9 @@ func startRabbitMQConsumer(ctx context.Context, cfg *config.Config, svc *service
 		conn.Close()
 	}()
 
-	return consumer.Start(ch, queueName, svc)
+	consum := consumer.Start(ch, queueName, svc)
+
+	return consum
 }
 
 func startAPIServer(ctx context.Context, cfg *config.Config, svc *services.MovimientoService) error {
@@ -116,18 +119,17 @@ func startAPIServer(ctx context.Context, cfg *config.Config, svc *services.Movim
 	router := api.NewRouter(handler)
 
 	server := &http.Server{
-		Addr:    ":8080", // Puedes poner esto en tu .env si quieres
+		Addr:    ":8081",
 		Handler: router,
 	}
 
-	// Escuchar por la cancelación del contexto para apagar el servidor
 	go func() {
 		<-ctx.Done()
 		log.Println("🔌 Deteniendo servidor API...")
 		server.Shutdown(context.Background())
 	}()
 
-	log.Println("🚀 Servidor HTTP escuchando en el puerto :8080")
+	log.Println("🚀 Servidor HTTP escuchando en el puerto :8081")
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		return fmt.Errorf("error en servidor API: %w", err)
 	}
