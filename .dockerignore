@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Binarios y builds locales
+api
+main
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tests
+*.test
+*.out
+
+# Documentación
+README.md
+*.md
+
+# Variables de entorno locales
+.env.local
+.env.development

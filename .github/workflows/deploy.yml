@@ -1,0 +1,91 @@
+name: Build and Deploy Go API to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Permisos para autenticación segura con AWS OIDC
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # --- JOB 1: CONSTRUIR Y SUBIR LA IMAGEN A ECR ---
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-22.04-arm
+
+    outputs:
+      image_tag: ${{ steps.build-image.outputs.image_tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "APP_SECRET_ID=${{ secrets.SECRET_MANAGER_NAME }}" > .env
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # --- JOB 2: DESPLEGAR LA NUEVA IMAGEN EN ECS ---
+  deploy-to-ecs:
+    name: Deploy to ECS
+    runs-on: ubuntu-22.04-arm
+    needs: build-and-push
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download task definition
+        run: |
+          aws ecs describe-task-definition --task-definition true-stock-api-movement --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: api-movement
+          image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY }}:${{ needs.build-and-push.outputs.image_tag }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: true-stock-api-movement
+          cluster: true-stock-cluster
+          wait-for-service-stability: true
+
+      - name: Check deployment status
+        run: |
+          echo "Checking service status..."
+          aws ecs describe-services --cluster true-stock-cluster --services true-stock-api-movement --query 'services[0].{Status:status,RunningCount:runningCount,PendingCount:pendingCount,DesiredCount:desiredCount}'
+          
+          echo "Checking task status..."
+          TASK_ARN=$(aws ecs list-tasks --cluster true-stock-cluster --service-name true-stock-api-movement --query 'taskArns[0]' --output text)
+          if [ "$TASK_ARN" != "None" ]; then
+            aws ecs describe-tasks --cluster true-stock-cluster --tasks $TASK_ARN --query 'tasks[0].{LastStatus:lastStatus,HealthStatus:healthStatus,StoppedReason:stoppedReason,Containers:containers[0].{Name:name,LastStatus:lastStatus,ExitCode:exitCode,Reason:reason}}'
+          fi
