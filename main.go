@@ -24,15 +24,11 @@ import (
 func main() {
 	log.Println("=== Iniciando API y Consumidor de Movimientos ===")
 
-	// 1. Cargar configuración desde .env
-	// Tu función LoadSecretManager en realidad carga desde .env, lo cual está bien.
-	cfg, err := config.LoadSecretManager(context.Background())
-	if err != nil {
-		log.Fatalf("❌ Error cargando config: %v", err)
-	}
+	ctx := context.Background()
+	cfg := getSecrets(ctx)
 
 	// 2. Conectar a la base de datos (una sola vez)
-	db, err := database.Connect(cfg.DBUser, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	db, err := database.Connect(cfg.User, cfg.Pass, cfg.Host, cfg.Name, cfg.Port)
 	if err != nil {
 		log.Fatalf("❌ Error conectando a PostgreSQL: %v", err)
 	}
@@ -76,11 +72,12 @@ func main() {
 	log.Println("👋 Aplicación detenida correctamente.")
 }
 
-func startRabbitMQConsumer(ctx context.Context, cfg *config.Config, svc *services.MovimientoService) error {
+func startRabbitMQConsumer(ctx context.Context, cfg *config.SecretApp, svc *services.MovimientoService) error {
+
 	rootCAs, _ := x509.SystemCertPool()
 	tlsConfig := &tls.Config{RootCAs: rootCAs}
-	rabbitURL := fmt.Sprintf("amqps://%s:%s@%s:%s/%s",
-		cfg.RabbitUser, cfg.RabbitPass, cfg.RabbitHost, cfg.RabbitPort, cfg.RabbitVHost)
+	rabbitURL := fmt.Sprintf("amqps://%s:%s@%s:%d/",
+		cfg.MQ_USER, cfg.MQ_PASSWORD, cfg.MQ_HOST, cfg.MQ_PORT)
 
 	conn, err := amqp.DialTLS(rabbitURL, tlsConfig)
 	if err != nil {
@@ -114,7 +111,7 @@ func startRabbitMQConsumer(ctx context.Context, cfg *config.Config, svc *service
 	return consum
 }
 
-func startAPIServer(ctx context.Context, cfg *config.Config, svc *services.MovimientoService) error {
+func startAPIServer(ctx context.Context, cfg *config.SecretApp, svc *services.MovimientoService) error {
 	handler := api.NewMovementHandler(svc)
 	router := api.NewRouter(handler)
 
@@ -134,4 +131,12 @@ func startAPIServer(ctx context.Context, cfg *config.Config, svc *services.Movim
 		return fmt.Errorf("error en servidor API: %w", err)
 	}
 	return nil
+}
+
+func getSecrets(ctx context.Context) *config.SecretApp {
+	cfg, err := config.LoadSecretManager(ctx)
+	if err != nil {
+		log.Fatalf("config error: %v", err)
+	}
+	return cfg
 }

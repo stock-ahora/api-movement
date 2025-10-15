@@ -1,29 +1,49 @@
 package config
 
 import (
-    "context"
-    "log"
-    "os"
-    "github.com/joho/godotenv"
+	"api-movement/config_lib"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+
+	"github.com/joho/godotenv"
 )
 
-func init() {
-    godotenv.Load()
+func LoadSecretManager(ctx context.Context) (*SecretApp, error) {
+
+	secretID := getEnv("APP_SECRET_ID", "EMPTY")
+	log.Printf("config_lib ID %s", secretID)
+
+	if secretID == "" {
+		return nil, fmt.Errorf("APP_SECRET_ID no definido")
+	}
+
+	//todo: cambiar la region por la variable de entorno
+	region := "us-east-2"
+
+	sm, err := config_lib.New(ctx, region)
+	if err != nil {
+		return nil, fmt.Errorf("crear secrets manager: %w", err)
+	}
+
+	raw, err := sm.GetSecretString(ctx, secretID, "AWSCURRENT")
+	if err != nil {
+		return nil, fmt.Errorf("obtener secreto: %w", err)
+	}
+
+	//todo: eliminar este log
+	log.Printf("Secreto obtenido: %s", raw)
+
+	var cfg SecretApp
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return nil, fmt.Errorf("parsear secreto  JSON: %w", err)
+	}
+	return &cfg, nil
 }
 
-func LoadSecretManager(ctx context.Context) (*Config, error) {
-    log.Println("Cargando configuración desde .env")
-
-    return &Config{
-        RabbitUser:  os.Getenv("RABBIT_USER"),
-        RabbitPass:  os.Getenv("RABBIT_PASSWORD"),
-        RabbitHost:  os.Getenv("RABBIT_HOST"),
-        RabbitPort:  os.Getenv("RABBIT_PORT"),
-        RabbitVHost: os.Getenv("RABBIT_VHOST"),
-        DBHost:      os.Getenv("DB_HOST"),
-        DBPort:      os.Getenv("DB_PORT"),
-        DBUser:      os.Getenv("DB_USER"),
-        DBPass:      os.Getenv("DB_PASSWORD"),
-        DBName:      os.Getenv("DB_NAME"),
-    }, nil
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No se encontró archivo .env: %v", err)
+	}
 }

@@ -61,7 +61,7 @@ func Start(ch *amqp.Channel, queueName string, svc *services.MovimientoService) 
 
 			if err := svc.ProcessMovement(event); err != nil {
 				log.Printf("🚨 Error procesando movimiento: %v. Re-encolando mensaje.", err)
-				msg.Nack(false, true) // Re-encolar mensaje para reintentar
+				msg.Nack(false, false) // Re-encolar mensaje para reintentar
 			} else {
 				log.Printf("✅ Mensaje para movimiento %s procesado y confirmado.", event.Id)
 				msg.Ack(false) // Confirmar que el mensaje fue procesado

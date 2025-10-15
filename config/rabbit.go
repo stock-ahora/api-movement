@@ -9,11 +9,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func NewRabbitMq(cfg *Config) (*amqp.Connection, *amqp.Channel) {
+func NewRabbitMq(cfg *SecretApp) (*amqp.Connection, *amqp.Channel) {
 	rootCAs, _ := x509.SystemCertPool()
 	tlsConfig := &tls.Config{RootCAs: rootCAs}
 
-	url := fmt.Sprintf("amqps://%s:%s@%s:%s/%s", cfg.RabbitUser, cfg.RabbitPass, cfg.RabbitHost, cfg.RabbitPort, cfg.RabbitVHost)
+	url := fmt.Sprintf("amqps://%s:%s@%s:%d/%s", cfg.MQ_USER, cfg.MQ_PASSWORD, cfg.MQ_HOST, cfg.MQ_PORT, cfg.MQ_VHOST)
 	conn, err := amqp.DialTLS(url, tlsConfig)
 	if err != nil {
 		log.Fatalf("❌ Error conectando a RabbitMQ: %v", err)
