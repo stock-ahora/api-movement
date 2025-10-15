@@ -8,7 +8,6 @@ docker-compose.yml
 .dockerignore
 
 # Binarios y builds locales
-api
 main
 *.exe
 *.dll
